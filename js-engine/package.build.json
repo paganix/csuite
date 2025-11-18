@@ -1,0 +1,7 @@
+{
+  "name": "crypto-suite",
+  "version": "0.1.1",
+  "main": "index.js",
+  "repository": "https://github.com/paganix/csuite.git",
+  "license": "AGPL-3.0-only"
+}
