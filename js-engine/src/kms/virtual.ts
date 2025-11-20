@@ -5,9 +5,9 @@ import type { MaybePromise } from "../@internals/types";
 import { CancellationTokenSource, type ICancellationToken } from "../@internals/cancellation";
 
 
-export type Getter<T> = (_token: ICancellationToken) => MaybePromise<T | null>;
+export type CancellableGetter<T> = (_token: ICancellationToken) => MaybePromise<T | null>;
 
-export interface VGetterInit {
+interface VGetterInit {
   maxCalls?: number;
   token?: ICancellationToken;
 }
@@ -18,10 +18,10 @@ export class VolatileGetter<T> implements IDisposable {
   #ExternalToken: ICancellationToken | null;
   #MaxCalls: number | null;
   #CallsCount: number;
-  #Caller: Getter<T>;
+  #Caller: CancellableGetter<T>;
   
   public constructor(
-    _getValue: Getter<T>,
+    _getValue: CancellableGetter<T>,
     _options?: VGetterInit // eslint-disable-line comma-dangle
   ) {
     this.#Disposed = false;

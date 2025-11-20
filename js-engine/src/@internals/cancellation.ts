@@ -1,3 +1,12 @@
+
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License.
+ * 
+ * Modified in 2025 by João Pagani
+ *--------------------------------------------------------------------------------------------*/
+
+
 import { EventLoop } from "./event-loop";
 import { Disposable, IDisposable } from "./disposable";
 
@@ -123,7 +132,7 @@ export class CancellationTokenSource {
   }
 
   public dispose(cancel: boolean = false, cancellationReason?: any): void {
-    if(cancel === true) {
+    if(cancel) {
       this.cancel(cancellationReason);
     }
 

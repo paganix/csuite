@@ -44,7 +44,7 @@ describe("encoders/text", () => {
     const data = randomBytes(12);
 
     const nodeStr = data.toString("base64");
-    const base64Str = Base64.encode(data, { avoidNodeBuffer: true });
+    const base64Str = Base64.encode(data, { dontUseNodeBuffer: true });
 
     expect(nodeStr).toStrictEqual(base64Str);
   });
@@ -53,7 +53,7 @@ describe("encoders/text", () => {
     const data = randomBytes(12).toString("base64");
 
     const nodeBuf = Buffer.from(data, "base64");
-    const u8Buf = Base64.decode(data, { avoidNodeBuffer: true });
+    const u8Buf = Base64.decode(data, { dontUseNodeBuffer: true });
 
     expect(timingSafeEqual(u8Buf, nodeBuf)).toBe(true);
   });
@@ -62,7 +62,7 @@ describe("encoders/text", () => {
     const data = randomBytes(12);
 
     const nodeStr = data.toString("base64url");
-    const base64Str = Base64.encode(data, { avoidNodeBuffer: true, urlSafe: true });
+    const base64Str = Base64.encode(data, { dontUseNodeBuffer: true, urlSafe: true });
 
     expect(nodeStr).toStrictEqual(base64Str);
   });
@@ -71,7 +71,7 @@ describe("encoders/text", () => {
     const data = randomBytes(12).toString("base64url");
 
     const nodeBuf = Buffer.from(data, "base64url");
-    const u8Buf = Base64.decode(data, { avoidNodeBuffer: true, urlSafe: true });
+    const u8Buf = Base64.decode(data, { dontUseNodeBuffer: true, urlSafe: true });
 
     expect(timingSafeEqual(u8Buf, nodeBuf)).toBe(true);
   });

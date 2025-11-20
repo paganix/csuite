@@ -15,6 +15,9 @@ export const enum ERROR_CODE {
 
   /** The given value is out of bounds */
   E_CRYPTO_OUT_OF_BOUNDS = 0x109,
+
+  /** [describe the error] */
+  E_CRYPTO_UNSUPPORTED_OPERATION = 0x10A,
 }
 
 
@@ -35,7 +38,7 @@ export class CryptoError extends Error {
   public readonly context: Dict<unknown>;
 
   public constructor(
-    message: string | null,
+    message?: string | null,
     code: number = ERROR_CODE.E_CRYPTO_FAILURE,
     options?: ExceptionInit // eslint-disable-line comma-dangle
   ) {

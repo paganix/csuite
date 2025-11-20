@@ -14,8 +14,20 @@ const dec2hex256 = new Lazy(() => new Array<string>(0x100));
 
 const b64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 const b64UrlChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-const b64DecTable = new Lazy(() => new Array(0x100));
-const b64UrlDecTable = new Lazy(() => new Array(0x100));
+
+const b64DecTable = new Lazy(() => {
+  const arr = new Array<number>(0x100);
+  arr[0x3D] = 0;
+
+  return arr;
+});
+
+const b64UrlDecTable = new Lazy(() => {
+  const arr = new Array<number>(0x100);
+  arr[0x3D] = 0;
+
+  return arr;
+});
 
 const hasNodeBuffer = typeof Buffer !== "undefined";
 
@@ -41,13 +53,20 @@ for(let i = 0; i < 0x40; ++i) {
   b64UrlDecTable.value[b64UrlChars.charCodeAt(i)] = i;
 }
 
-b64DecTable.value["=".charCodeAt(0)] = 0;
-b64UrlDecTable.value["=".charCodeAt(0)] = 0;
-
 Object.freeze(hex2dec);
 
 
+export const K_ENC_UTF_8 = 0x38;
+export const K_ENC_LATIN_1 = 0x39;
+export const K_ENC_UTF_16 = 0x3F;
+export const K_ENC_BASE64 = 0xC5;
+export const K_ENC_HEX = 0xC6;
+export const K_ENC_BASE64_URL = 0x57;
+
+
 export namespace Utf8 {
+  export const CODE: number = K_ENC_UTF_8;
+
   export function encode(data: string): Uint8Array {
     return textEnc_().encode(data);
   }
@@ -58,6 +77,8 @@ export namespace Utf8 {
 }
 
 export namespace Hex {
+  export const CODE: number = K_ENC_HEX;
+
   export function encode(data: Uint8Array | string, avoidBuffer?: boolean): string {
     if(hasNodeBuffer && !avoidBuffer)
       return Buffer.from(data).toString("hex");
@@ -75,10 +96,10 @@ export namespace Hex {
     return hex;
   }
 
-  export function decode(data: string, asString?: false, avoidBuffer?: boolean): Uint8Array;
-  export function decode(data: string, asString: true, avoidBuffer?: boolean): string;
-  export function decode(data: string, asString?: boolean, avoidBuffer?: boolean): string | Uint8Array {
-    if(hasNodeBuffer && !avoidBuffer) {
+  export function decode(data: string, asString?: false, dontUseBuffer?: boolean): Uint8Array;
+  export function decode(data: string, asString: true, dontUseBuffer?: boolean): string;
+  export function decode(data: string, asString?: boolean, dontUseBuffer?: boolean): string | Uint8Array {
+    if(hasNodeBuffer && !dontUseBuffer) {
       const buf = Buffer.from(data, "hex");
       return asString ? buf.toString("utf8") : buf;
     }
@@ -105,10 +126,13 @@ export namespace Hex {
 }
 
 export namespace Base64 {
-  export type TypedOptions = { urlSafe?: boolean; avoidNodeBuffer?: boolean };
+  export type TypedOptions = { urlSafe?: boolean; dontUseNodeBuffer?: boolean };
+
+  export const CODE: number = K_ENC_BASE64;
+  export const URL_SAFE_CODE: number = K_ENC_BASE64_URL;
 
   export function encode(data: Uint8Array | string, options?: TypedOptions): string {
-    if(hasNodeBuffer && !options?.avoidNodeBuffer) {
+    if(hasNodeBuffer && !options?.dontUseNodeBuffer) {
       const buf = Buffer.from(data);
       return buf.toString(options?.urlSafe ? "base64url" : "base64");
     }
@@ -116,7 +140,7 @@ export namespace Base64 {
     if(typeof data === "string") {
       data = Utf8.encode(data);
     }
-
+    
     const alphabet = options?.urlSafe ? b64UrlChars : b64Chars;
     const len = data.length;
 
@@ -165,12 +189,12 @@ export namespace Base64 {
   }
 
   export function decode(data: string, options?: TypedOptions): Uint8Array {
-    if(hasNodeBuffer && !options?.avoidNodeBuffer)
+    if(hasNodeBuffer && !options?.dontUseNodeBuffer)
       return Buffer.from(data, options?.urlSafe ? "base64url" : "base64");
     
     const table = options?.urlSafe ? b64UrlDecTable : b64DecTable;
     let end = data.length;
-
+    
     while(end > 0 && data[end - 1] === "=") {
       end--;
     }
@@ -226,6 +250,8 @@ export namespace Base64 {
 }
 
 export namespace Latin1 {
+  export const CODE: number = K_ENC_LATIN_1;
+
   export function encode(data: string): Uint8Array {
     const len = data.length;
     const u8 = new Uint8Array(len);
@@ -255,8 +281,10 @@ export namespace Latin1 {
 }
 
 export namespace Utf16 {
-  export function encode(data: string, avoidBuffer?: boolean): Uint8Array {
-    if(hasNodeBuffer && !avoidBuffer)
+  export const CODE: number = K_ENC_UTF_16;
+
+  export function encode(data: string, dontUseBuffer?: boolean): Uint8Array {
+    if(hasNodeBuffer && !dontUseBuffer)
       return Buffer.from(data, "utf16le");
 
     const len = data.length;
@@ -271,8 +299,8 @@ export namespace Utf16 {
     return u8;
   }
 
-  export function decode(data: Uint8Array, avoidBuffer?: boolean): string {
-    if(hasNodeBuffer && !avoidBuffer)
+  export function decode(data: Uint8Array, dontUseBuffer?: boolean): string {
+    if(hasNodeBuffer && !dontUseBuffer)
       return Buffer.from(data).toString("utf16le");
 
     if(data.length % 2 !== 0) {

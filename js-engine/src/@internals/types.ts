@@ -12,6 +12,8 @@ export type MaybePromise<T> = T | Promise<T>;
 export type BinaryToTextEncoding = "base64" | "base64url" | "hex" | "binary";
 export type CharacterEncoding = "utf8" | "utf-8" | "utf16le" | "utf-16le" | "latin1";
 
+export type ByteEncoding = CharacterEncoding | BinaryToTextEncoding;
+
 
 export type Dict<T> = {
   [key: string]: T;
