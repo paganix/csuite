@@ -56,6 +56,7 @@ export interface IByteArrayLike<TBase extends Buffer | Uint8Array = Uint8Array> 
 
   equals(other: IByteArrayLike<Buffer | Uint8Array> | Uint8Array): boolean;
   toString(encoding?: ByteEncoding): string;
+  cleanup(): void;
 }
 
 export type BinaryWrap = IByteArrayLike<Buffer | Uint8Array> | Buffer | Uint8Array;
@@ -147,7 +148,7 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     );
   }
 
-  public static concat(buffers: ByteArray[], totalLength?: number): ByteArray {
+  public static concat(buffers: IByteArray[], totalLength?: number): ByteArray {
     if(typeof totalLength !== "number") {
       totalLength = 0;
 
@@ -198,7 +199,7 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     }
     
     if(Array.isArray(value) && value.every(x => typeof x === "number"))
-      return new ByteArray( Uint8Array.from(value) );
+      return new ByteArray( hasNodeBuffer ? Buffer.from(value) : Uint8Array.from(value) );
 
     if(typeof value === "string") {
       if(
@@ -230,7 +231,7 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     }
 
     if(depth > 0) {
-      throw new CryptoError(`[ByteArray] Failed to cast unknown object to byte array 'typeof ${typeof value}'`, ERROR_CODE.E_CRYPTO_INVALID_ARGUMENT);
+      throw new CryptoError(`[ByteArray] Failed to cast unknown object to byte array 'typeof ${typeof value}'`, ERROR_CODE.E_CRYPTO_INVALID_TYPE);
     }
 
     if(
@@ -244,7 +245,7 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
       typeof value[Symbol.toStringTag] === "function"
     ) return ByteArray.#From_(String(value), encodingOrByteOffset, length, { ...options, depth: depth + 1});
 
-    throw new CryptoError(`[ByteArray] Failed to cast unknown object to byte array 'typeof ${typeof value}'`, ERROR_CODE.E_CRYPTO_INVALID_ARGUMENT);
+    throw new CryptoError(`[ByteArray] Failed to cast unknown object to byte array 'typeof ${typeof value}'`, ERROR_CODE.E_CRYPTO_INVALID_TYPE);
   }
 
   #IsBuffer: boolean;
@@ -402,6 +403,11 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
         throw new CryptoError(`[ByteArray] Invalid or unknown text encoding "${encoding}"`, ERROR_CODE.E_CRYPTO_INVALID_ARGUMENT);
     }
   }
+
+  public cleanup(): void {
+    this.#U8Array = null!;
+    this.#U8Array = (this.#IsBuffer ? Buffer.alloc(0) : new Uint8Array(0)) as TBase;
+  }
 }
 
 
@@ -528,4 +534,64 @@ export function bufferWithEncoding(
     return enc && ByteArray.isByteEncoding(enc) ? buf.toString(enc) : buf;
 
   throw new CryptoError(`Cannot resolve unknown 'typeof ${typeof buf}' as binary wrap`, ERROR_CODE.E_CRYPTO_INVALID_ARGUMENT);
+}
+
+
+export function toByteArray(chunk: unknown): ByteArray {
+  if(chunk instanceof ByteArray)
+    return chunk;
+
+  if(typeof chunk === "string")
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof ArrayBuffer)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof Uint8Array)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof Uint16Array)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof Uint32Array)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof Int8Array)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof Int16Array)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof Int32Array)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof Float32Array)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof Float64Array)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof SharedArrayBuffer)
+    return ByteArray.from(chunk);
+  
+  if(chunk instanceof DataView)
+    return ByteArray.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+
+  if(ArrayBuffer.isView(chunk))
+    return ByteArray.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+
+  if(Array.isArray(chunk))
+    return ByteArray.from(chunk);
+
+  throw new CryptoError(`Failed to cast 'typeof ${typeof chunk}' to binary representation`, ERROR_CODE.E_CRYPTO_INVALID_TYPE);
+}
+
+export function chunkToBuffer(obj: unknown): Uint8Array {
+  if(hasNodeBuffer && Buffer.isBuffer(obj))
+    return obj;
+
+  if(obj instanceof Uint8Array)
+    return obj;
+
+  return toByteArray(obj).unwrap();
 }

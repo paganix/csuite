@@ -5,6 +5,12 @@ import type { MaybePromise } from "../@internals/types";
 import { CancellationTokenSource, type ICancellationToken } from "../@internals/cancellation";
 
 
+export interface IGetter<T> extends IDisposable {
+  get(): MaybePromise<T | null>;
+  getValueAsync(): Promise<T | null>;
+  getValue(): T | null;
+}
+
 export type CancellableGetter<T> = (_token: ICancellationToken) => MaybePromise<T | null>;
 
 interface VGetterInit {
@@ -12,7 +18,7 @@ interface VGetterInit {
   token?: ICancellationToken;
 }
 
-export class VolatileGetter<T> implements IDisposable {
+export class VolatileGetter<T> implements IGetter<T> {
   #Disposed: boolean;
   #Source: CancellationTokenSource;
   #ExternalToken: ICancellationToken | null;

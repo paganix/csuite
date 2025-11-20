@@ -18,6 +18,9 @@ export const enum ERROR_CODE {
 
   /** [describe the error] */
   E_CRYPTO_UNSUPPORTED_OPERATION = 0x10A,
+
+  /** [describe the error] */
+  E_CRYPTO_RESOURCE_DISPOSED = 0x10B,
 }
 
 
