@@ -4,7 +4,7 @@ import { hkdf } from "../hash/hkdf";
 import { type IGetter } from "../kms";
 import { K128, K192, K256 } from "../const";
 import { CryptoError, ERROR_CODE } from "../@internals/errors";
-import { ByteWriter, inlineSerialize } from "../binary-protocol";
+import { ByteReader, ByteWriter, inlineDeserialize, inlineSerialize } from "../binary-protocol";
 import type { BufferLike, ByteEncoding } from "../@internals/types";
 import { bufferWithEncoding, ByteArray, mask, toByteArray, type IByteArray } from "../buffer";
 
@@ -135,7 +135,7 @@ export namespace AEAD {
 
 export interface AEADOptions {
   salt?: IGetter<IByteArray>;
-  bufferMask?: IGetter<IByteArray>;
+  bufferMask?: IGetter<IByteArray | number>;
 }
 
 export function aead_encrypt(
@@ -205,86 +205,21 @@ export async function aead_encrypt(
     headerCipherText // eslint-disable-line comma-dangle
   );
 
-  inlineSerialize(writer, AEAD_VERSION);
-  inlineSerialize(writer, mode.agid);
-  inlineSerialize(writer, kLen);
+  const buffer: IByteArray = await serializeEnvelope_({
+    dataIV,
+    ciphertext,
+    headerCipherText,
+    headerTag,
+    headerIV,
+    dataTag,
+    agid: mode.agid,
+    keyLen: kLen,
+    optionLayer: OPTION_DONT_USE_LAYERS,
+    version: AEAD_VERSION,
+    mask: options?.bufferMask,
+  });
 
-  inlineSerialize(
-    writer,
-    mask(
-      headerIV.unwrap(),
-      options?.bufferMask
-        ? toByteArray(options.bufferMask).unwrap()
-        : null,
-      true // eslint-disable-line comma-dangle
-    ) // eslint-disable-line comma-dangle
-  );
-
-  inlineSerialize(
-    writer,
-    mask(
-      headerCipherText,
-      options?.bufferMask
-        ? toByteArray(options.bufferMask).unwrap()
-        : null,
-      true // eslint-disable-line comma-dangle
-    ) // eslint-disable-line comma-dangle
-  );
-
-  inlineSerialize(
-    writer,
-    mask(
-      headerTag,
-      options?.bufferMask
-        ? toByteArray(options.bufferMask).unwrap()
-        : null,
-      true // eslint-disable-line comma-dangle
-    ) // eslint-disable-line comma-dangle
-  );
-
-  inlineSerialize(
-    writer,
-    mask(
-      dataIV.unwrap(),
-      options?.bufferMask
-        ? toByteArray(options.bufferMask).unwrap()
-        : null,
-      true // eslint-disable-line comma-dangle
-    ) // eslint-disable-line comma-dangle
-  );
-
-  inlineSerialize(
-    writer,
-    mask(
-      ciphertext,
-      options?.bufferMask
-        ? toByteArray(options.bufferMask).unwrap()
-        : null,
-      true // eslint-disable-line comma-dangle
-    ) // eslint-disable-line comma-dangle
-  );
-
-  inlineSerialize(
-    writer,
-    mask(
-      dataTag,
-      options?.bufferMask
-        ? toByteArray(options.bufferMask).unwrap()
-        : null,
-      true // eslint-disable-line comma-dangle
-    ) // eslint-disable-line comma-dangle
-  );
-
-  inlineSerialize(writer, [ 0x0 ]);
-  
-  return bufferWithEncoding(
-    ByteArray.concat([
-      AEAD_MAGIC,
-      ByteArray.from([ OPTION_DONT_USE_LAYERS ]),
-      writer.drain(),
-    ]),
-    enc // eslint-disable-line comma-dangle
-  );
+  return bufferWithEncoding(buffer, enc);
 }
 
 
@@ -294,7 +229,7 @@ export function aead_layered_encrypt(
   payload: IByteArray | BufferLike,
   aad?: IByteArray | BufferLike | null,
   enc?: null,
-  layers?: number,
+  layers?: number | null,
   options?: AEADOptions // eslint-disable-line comma-dangle
 ): Promise<IByteArray>;
 
@@ -304,7 +239,7 @@ export function aead_layered_encrypt(
   payload: IByteArray | BufferLike,
   aad: IByteArray | BufferLike | null,
   enc: ByteEncoding,
-  layers?: number,
+  layers?: number | null,
   options?: AEADOptions // eslint-disable-line comma-dangle
 ): Promise<string>;
 
@@ -314,9 +249,13 @@ export async function aead_layered_encrypt(
   payload: IByteArray | BufferLike,
   aad?: IByteArray | BufferLike | null,
   enc?: ByteEncoding | null,
-  layers: number = 7,
+  layers: number | null = 7,
   options?: AEADOptions // eslint-disable-line comma-dangle
 ): Promise<IByteArray | string> {
+  if(!layers) {
+    layers = 4;
+  }
+
   if(layers < 4) {
     layers = 4;
   }
@@ -347,6 +286,82 @@ export async function aead_layered_encrypt(
     ]),
     enc // eslint-disable-line comma-dangle
   );
+}
+
+
+export function aead_decrypt(
+  masterKey: IGetter<IByteArray>,
+  payload: IByteArray | BufferLike,
+  aad?: IByteArray | BufferLike | null,
+  enc?: null,
+  inputEnc?: ByteEncoding | null,
+  options?: AEADOptions // eslint-disable-line comma-dangle
+): Promise<IByteArray>;
+
+export function aead_decrypt(
+  masterKey: IGetter<IByteArray>,
+  payload: IByteArray | BufferLike,
+  aad: IByteArray | BufferLike | null,
+  enc: ByteEncoding,
+  inputEnc?: ByteEncoding | null,
+  options?: AEADOptions // eslint-disable-line comma-dangle
+): Promise<string>;
+
+export async function aead_decrypt(
+  masterKey: IGetter<IByteArray>,
+  payload: IByteArray | BufferLike,
+  aad?: IByteArray | BufferLike | null,
+  enc?: ByteEncoding | null,
+  inputEnc?: ByteEncoding | null,
+  options?: AEADOptions // eslint-disable-line comma-dangle
+): Promise<IByteArray | string> {
+  if(
+    typeof payload === "string" &&
+    inputEnc && ByteArray.isByteEncoding(inputEnc)
+  ) {
+    payload = ByteArray.from(payload, inputEnc);
+  }
+
+  const reader = new ByteReader(payload);
+
+  if(!reader.read(AEAD_MAGIC.size()).equals(AEAD_MAGIC)) {
+    throw new CryptoError("Decription failed: the given argument don't appear to be a cipher text");
+  }
+
+  const lFlag = reader.read(1).unwrap()[0];
+
+  if(lFlag !== OPTION_DONT_USE_LAYERS) {
+    throw new CryptoError("Don't known how to decrypt a layered envelope");
+  }
+
+  const version = inlineDeserialize<number>(reader);
+
+  if(AEAD_VERSION !== version) {
+    throw new CryptoError(`Don't known how to decrypt v${version} envelope`);
+  }
+
+  const mode = AEADMode.for(inlineDeserialize<number>(reader));
+  const kLen = inlineDeserialize<number>(reader);
+
+  const mK = (await masterKey.get())?.unwrap();
+  const expectedLen = mK?.byteLength ?? -1; 
+  mK?.fill(0);
+
+  if(expectedLen !== kLen) {
+    throw new CryptoError("The given key length didn't match with expected");
+  }
+
+  if(!kLen || !mode.allowedKeySizeInBytes.includes(kLen)) {
+    throw new CryptoError(`Invalid key length for "${mode.basename}" (${kLen}) { ${mode.allowedKeySizeInBytes.join(", ")} }`, ERROR_CODE.E_CRYPTO_INVALID_KEY_LENGTH);
+  }
+
+  const dSalt = (await options?.salt?.get())?.unwrap();
+  const [headerKey, dataKey] = await deriveKeys_(masterKey, kLen, dSalt);
+  
+  dSalt?.fill(0);
+  const envelope = await deserializeEnvelopeSpecs_(reader, options?.bufferMask);
+
+  return void aad, enc, dataKey, headerKey, envelope as unknown as any;
 }
 
 
@@ -490,6 +505,159 @@ function genIV_(len: number): IByteArray {
   }
 
   return ByteArray.concat([ ivPrefix, ByteArray.from(ctrBuf) ]);
+}
+
+async function serializeEnvelope_(data: {
+  version: number;
+  agid: number;
+  keyLen: number;
+  headerIV: IByteArray;
+  headerCipherText: Uint8Array;
+  headerTag: Uint8Array;
+  dataIV: IByteArray;
+  ciphertext: Uint8Array;
+  dataTag: Uint8Array;
+  optionLayer: number;
+  mask?: IGetter<IByteArray | number>;
+}): Promise<IByteArray> {
+  let bufMask: any = await data.mask?.get();
+  const writer = new ByteWriter();
+
+  if(typeof bufMask !== "number" && !!bufMask) {
+    bufMask = toByteArray(bufMask).unwrap();
+  }
+
+  inlineSerialize(writer, AEAD_VERSION);
+  inlineSerialize(writer, data.agid);
+  inlineSerialize(writer, data.keyLen);
+
+  inlineSerialize(
+    writer,
+    mask(
+      data.headerIV.unwrap(),
+      bufMask as Uint8Array | number | undefined,
+      true // eslint-disable-line comma-dangle
+    ) // eslint-disable-line comma-dangle
+  );
+
+  inlineSerialize(
+    writer,
+    mask(
+      data.headerCipherText,
+      bufMask as Uint8Array | number | undefined,
+      true // eslint-disable-line comma-dangle
+    ) // eslint-disable-line comma-dangle
+  );
+
+  inlineSerialize(
+    writer,
+    mask(
+      data.headerTag,
+      bufMask as Uint8Array | number | undefined,
+      true // eslint-disable-line comma-dangle
+    ) // eslint-disable-line comma-dangle
+  );
+
+  inlineSerialize(
+    writer,
+    mask(
+      data.dataIV.unwrap(),
+      bufMask as Uint8Array | number | undefined,
+      true // eslint-disable-line comma-dangle
+    ) // eslint-disable-line comma-dangle
+  );
+
+  inlineSerialize(
+    writer,
+    mask(
+      data.ciphertext,
+      bufMask as Uint8Array | number | undefined,
+      true // eslint-disable-line comma-dangle
+    ) // eslint-disable-line comma-dangle
+  );
+
+  inlineSerialize(
+    writer,
+    mask(
+      data.dataTag,
+      bufMask as Uint8Array | number | undefined,
+      true // eslint-disable-line comma-dangle
+    ) // eslint-disable-line comma-dangle
+  );
+
+  inlineSerialize(writer, [0x0]);
+
+  return ByteArray.concat([
+    AEAD_MAGIC,
+    ByteArray.from([ data.optionLayer ]),
+    writer.drain(),
+  ]);
+}
+
+async function deserializeEnvelopeSpecs_(reader: ByteReader, M?: IGetter<IByteArray | number>): Promise<{
+  headerIV: Uint8Array;
+  headerCipherText: Uint8Array;
+  headerTag: Uint8Array;
+  dataIV: Uint8Array;
+  ciphertext: Uint8Array;
+  dataTag: Uint8Array;
+}> {
+  let bufMask: any = await M?.get();
+
+  if(typeof bufMask !== "number" && !!bufMask) {
+    bufMask = toByteArray(bufMask).unwrap();
+  }
+
+  const headerIV = mask(
+    inlineDeserialize<IByteArray>(reader).unwrap(),
+    bufMask,
+    true // eslint-disable-line comma-dangle
+  );
+
+  const headerCipherText = mask(
+    inlineDeserialize<IByteArray>(reader).unwrap(),
+    bufMask,
+    true // eslint-disable-line comma-dangle
+  );
+
+  const headerTag = mask(
+    inlineDeserialize<IByteArray>(reader).unwrap(),
+    bufMask,
+    true // eslint-disable-line comma-dangle
+  );
+
+  const dataIV = mask(
+    inlineDeserialize<IByteArray>(reader).unwrap(),
+    bufMask,
+    true // eslint-disable-line comma-dangle
+  );
+
+  const ciphertext = mask(
+    inlineDeserialize<IByteArray>(reader).unwrap(),
+    bufMask,
+    true // eslint-disable-line comma-dangle
+  );
+
+  const dataTag = mask(
+    inlineDeserialize<IByteArray>(reader).unwrap(),
+    bufMask,
+    true // eslint-disable-line comma-dangle
+  );
+
+  const endByte = inlineDeserialize<[0x0]>(reader);
+
+  if(!Array.isArray(endByte) || endByte[0] !== 0x0) {
+    throw new CryptoError("Failed to parse envelope specs due to unknown error");
+  }
+
+  return {
+    headerCipherText,
+    ciphertext,
+    dataIV,
+    dataTag,
+    headerIV,
+    headerTag,
+  };
 }
 
 function hasNodeCrypto_(): boolean {

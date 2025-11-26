@@ -1,7 +1,7 @@
-#include "../main/buffer.c"
+#include "../main/ciphers/aead.c"
 
 int main(void) {
-  CBuffer *buffer = cbuffer_alloc(8);
-  cbuffer_free(buffer);
+  void *s = (void *) malloc(sizeof(AEADMode));
+  free(s);
   return 0;
 }

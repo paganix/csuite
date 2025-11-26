@@ -701,7 +701,7 @@ export function mask(
 }
 
 export function bufferWithEncoding(buf: Buffer, enc?: BufferEncoding | null): Buffer | string;
-export function bufferWithEncoding<T extends ByteArray<Uint8Array | Buffer> = ByteArray<Uint8Array | Buffer>>(
+export function bufferWithEncoding<T extends IByteArray<Uint8Array | Buffer> = ByteArray<Uint8Array | Buffer>>(
   buf: T,
   enc?: ByteEncoding | null
 ): T | string;

@@ -9,8 +9,10 @@
     "build:no-fix": "tsc --emitDeclarationOnly && babel src --extensions \".js,.ts\" --out-dir dist --copy-files --no-copy-ignored",
     "test:watch": "clear && tsnd -r tsconfig-paths/register --transpile-only --respawn --ignore-watch node_modules src/test.ts",
     "test": "clear && yarn build && clear && NODE_ENV=test node ./dist/test.js && rm -rf ./dist/",
+    "test:inline": "yarn build && NODE_ENV=test node ./dist/test.js && rm -rf ./dist/",
     "hot": "tsc --noEmit && yarn build && clear && node ./dist/index.js && rm -rf ./dist/",
-    "spec": "clear && tsc --noEmit && NODE_ENV=test jest --verbose --runInBand"
+    "spec": "clear && tsc --noEmit && NODE_ENV=test jest --verbose --runInBand",
+    "spec:inline": "tsc --noEmit && NODE_ENV=test jest --verbose --runInBand"
   },
   "devDependencies": {
     "@babel/cli": "^7.27.2",

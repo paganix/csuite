@@ -170,17 +170,17 @@ function createOneByteBuffer_(value: number): IByteArray {
 }
 
 const TypePresets: {
-  readonly [K in keyof typeof SERIALIZABLE_DATA_TYPE]: IByteArray
+  readonly [K in keyof typeof SERIALIZABLE_DATA_TYPE]: Uint8Array // Just for debug
 } = Object.freeze({
-  NULL: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.NULL),
-  STRING: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.STRING),
-  UINT32: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.UINT32),
-  INT64: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.INT64),
-  FLOAT64: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.FLOAT64),
-  OBJECT: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.OBJECT),
-  ARRAY: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.ARRAY),
-  MARSHAL_OBJECT: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.MARSHAL_OBJECT),
-  BINARY: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.BINARY),
+  NULL: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.NULL).unwrap(),
+  STRING: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.STRING).unwrap(),
+  UINT32: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.UINT32).unwrap(),
+  INT64: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.INT64).unwrap(),
+  FLOAT64: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.FLOAT64).unwrap(),
+  OBJECT: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.OBJECT).unwrap(),
+  ARRAY: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.ARRAY).unwrap(),
+  MARSHAL_OBJECT: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.MARSHAL_OBJECT).unwrap(),
+  BINARY: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.BINARY).unwrap(),
 });
 
 
@@ -263,7 +263,8 @@ export function inlineSerialize(writer: IWriter, data: unknown): void {
     }
   } else if(
     data instanceof Uint8Array ||
-    data instanceof ArrayBuffer
+    data instanceof ArrayBuffer || 
+    data instanceof ByteArray
   ) {
     const buf = toByteArray(data).unwrap();
 
