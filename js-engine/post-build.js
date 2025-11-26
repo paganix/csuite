@@ -27,7 +27,7 @@ const MD_PATH = path.join(process.cwd(), '..', 'README.md');
       await rmfl(DEST_PATH, [
         {
           rule: 'pattern',
-          value: /(.*).spec.(ts|js)$/,
+          value: /(.*).spec(\.d)?.(ts|js)$/,
         },
         {
           rule: 'equals',

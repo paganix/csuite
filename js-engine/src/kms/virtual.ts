@@ -136,3 +136,14 @@ export class VolatileGetter<T> implements IGetter<T> {
     this.#Source = new CancellationTokenSource(this.#ExternalToken);
   }
 }
+
+
+export function isGetter<T>(obj: unknown): obj is IGetter<T> {
+  return (
+    typeof obj === "object" && !!obj &&
+    "getValue" in obj &&
+    typeof obj.getValue === "function" &&
+    "get" in obj &&
+    typeof obj.get === "function"
+  );
+}

@@ -14,6 +14,8 @@ export type CharacterEncoding = "utf8" | "utf-8" | "utf16le" | "utf-16le" | "lat
 
 export type ByteEncoding = CharacterEncoding | BinaryToTextEncoding;
 
+export type NumericFormat = "0x%x" | "0x%X" | "%d" | "%u"
+
 
 export type Dict<T> = {
   [key: string]: T;

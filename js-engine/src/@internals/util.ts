@@ -29,3 +29,12 @@ export function isInstance(thing: unknown): boolean {
     Object.getPrototypeOf(thing) !== Object.prototype
   );
 }
+
+
+export function exclude<T extends object, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([key]) => {
+      return !keys.includes(key as any);
+    }) // eslint-disable-line comma-dangle
+  ) as T;
+}

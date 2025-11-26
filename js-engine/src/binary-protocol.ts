@@ -1,4 +1,5 @@
 import { Utf8 } from "./encoders";
+import { type Either, left, right } from "./components";
 import { CryptoError, ERROR_CODE } from "./@internals/errors";
 import type { BufferLike, ByteEncoding } from "./@internals/types";
 import { ByteArray, toByteArray, type IByteArray } from "./buffer";
@@ -156,11 +157,12 @@ export const enum SERIALIZABLE_DATA_TYPE {
   NULL = 0,
   STRING = 1,
   UINT32 = 2,
-  FLOAT64 = 3,
-  OBJECT = 4,
-  ARRAY = 5,
-  MARSHAL_OBJECT = 6,
-  BINARY = 7,
+  INT64 = 3,
+  FLOAT64 = 4,
+  OBJECT = 5,
+  ARRAY = 6,
+  MARSHAL_OBJECT = 7,
+  BINARY = 8,
 }
 
 function createOneByteBuffer_(value: number): IByteArray {
@@ -173,6 +175,7 @@ const TypePresets: {
   NULL: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.NULL),
   STRING: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.STRING),
   UINT32: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.UINT32),
+  INT64: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.INT64),
   FLOAT64: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.FLOAT64),
   OBJECT: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.OBJECT),
   ARRAY: createOneByteBuffer_(SERIALIZABLE_DATA_TYPE.ARRAY),
@@ -238,6 +241,19 @@ export function inlineSerialize(writer: IWriter, data: unknown): void {
     writer.write(TypePresets.FLOAT64);
     writeInt32VQL(writer, str.length);
     writer.write(str);
+  } else if(typeof data === "bigint") {
+    const buf = ByteArray.alloc(8);
+    const sign = data < 0n ? 1 : 0;
+
+    if(sign === 1) {
+      buf.writeBigInt64BE(data, 0);
+    } else {
+      buf.writeBigUInt64BE(data, 0);
+    }
+
+    writer.write(TypePresets.INT64);
+    writeInt32VQL(writer, sign);
+    writer.write(buf);
   } else if(Array.isArray(data)) {
     writer.write(TypePresets.ARRAY);
     writeInt32VQL(writer, data.length);
@@ -282,6 +298,12 @@ export function inlineDeserialize<T = any>(reader: IReader): T {
     } break;
     case SERIALIZABLE_DATA_TYPE.UINT32:
       return readIntVQL(reader) as T;
+    case SERIALIZABLE_DATA_TYPE.INT64: {
+      const sign = readIntVQL(reader);
+      const buf = reader.read(8);
+
+      return buf[sign === 1 ? "readBigInt64BE" : "readBigUInt64BE"](0) as T;
+    } break;
     case SERIALIZABLE_DATA_TYPE.FLOAT64: {
       const strlen = readIntVQL(reader);
       return parseFloat(reader.read(strlen).toString()) as T;
@@ -314,5 +336,14 @@ export function inlineDeserialize<T = any>(reader: IReader): T {
     } break;
     default:
       throw new CryptoError(`Don't known how to deserialize unknown data type (0x${type.toString(16).toUpperCase()})`, ERROR_CODE.E_CRYPTO_INVALID_TYPE);
+  }
+}
+
+export function safeInlineDeserialize<T = any>(reader: IReader): Either<CryptoError, T> {
+  try {
+    const val = inlineDeserialize(reader);
+    return right(val);
+  } catch (err: any) {
+    return left(err);
   }
 }

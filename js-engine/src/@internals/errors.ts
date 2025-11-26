@@ -21,6 +21,9 @@ export const enum ERROR_CODE {
 
   /** [describe the error] */
   E_CRYPTO_RESOURCE_DISPOSED = 0x10B,
+
+  /** [describe the error] */
+  E_CRYPTO_INVALID_KEY_LENGTH = 0x10C,
 }
 
 

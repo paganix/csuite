@@ -22,6 +22,10 @@ import type {
 const hasNodeBuffer = typeof Buffer !== "undefined";
 const indexOfTable = new Lazy(() => new Uint8Array(0x100));
 
+const MAX_UINT64 = 18446744073709551615n;
+const MAX_INT64 = 9223372036854775807n;
+const MIN_INT64 = -9223372036854775808n;
+
 const supportedEncodings = new Set([
   "base64", "base64url", "hex", "binary",
   "utf8", "utf-8", "utf16le", "utf-16le", "latin1",
@@ -37,6 +41,7 @@ export interface IByteArrayLike<TBase extends Buffer | Uint8Array = Uint8Array> 
   subarray(start?: number, end?: number): ByteArray<TBase>;
   slice(start?: number, end?: number): ByteArray<TBase>;
   indexOf(subarray: ByteArray | Uint8Array, offset?: number): number;
+  size(): number;
 
   readUInt32BE(offset: number): number;
   writeUInt32BE(value: number, offset: number): void;
@@ -44,6 +49,15 @@ export interface IByteArrayLike<TBase extends Buffer | Uint8Array = Uint8Array> 
   writeUInt32LE(value: number, offset: number): void;
   readUInt8(offset: number): number;
   writeUInt8(value: number, offset: number): void;
+
+  writeBigInt64BE(value: bigint, offset: number): void;
+  writeBigInt64LE(value: bigint, offset: number): void;
+  writeBigUInt64BE(value: bigint, offset: number): void;
+  writeBigUInt64LE(value: bigint, offset: number): void;
+  readBigInt64LE(offset: number): bigint;
+  readBigInt64BE(offset: number): bigint;
+  readBigUInt64LE(offset: number): bigint;
+  readBigUInt64BE(offset: number): bigint;
 
   set(array: ByteArray, offset?: number): void;
   set(array: Uint8Array, offset?: number): void;
@@ -56,7 +70,7 @@ export interface IByteArrayLike<TBase extends Buffer | Uint8Array = Uint8Array> 
 
   equals(other: IByteArrayLike<Buffer | Uint8Array> | Uint8Array): boolean;
   toString(encoding?: ByteEncoding): string;
-  cleanup(): void;
+  cleanup(): IByteArrayLike<TBase>;
 }
 
 export type BinaryWrap = IByteArrayLike<Buffer | Uint8Array> | Buffer | Uint8Array;
@@ -77,7 +91,7 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     if(!hasNodeBuffer) {
       throw new CryptoError(
         "Feature ByteArray#allocUnsafe() is only available within Node.JS' Buffer API",
-        ERROR_CODE.E_CRYPTO_OUT_OF_BOUNDS // eslint-disable-line comma-dangle
+        ERROR_CODE.E_CRYPTO_UNSUPPORTED_OPERATION // eslint-disable-line comma-dangle
       );
     }
 
@@ -88,7 +102,7 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     if(!hasNodeBuffer) {
       throw new CryptoError(
         "Feature ByteArray#allocUnsafeSlow() is only available within Node.JS' Buffer API",
-        ERROR_CODE.E_CRYPTO_OUT_OF_BOUNDS // eslint-disable-line comma-dangle
+        ERROR_CODE.E_CRYPTO_UNSUPPORTED_OPERATION // eslint-disable-line comma-dangle
       );
     }
 
@@ -289,6 +303,10 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     return this.#IsBuffer;
   }
 
+  public size(): number {
+    return this.#U8Array.length;
+  }
+
   public subarray(start?: number, end?: number): ByteArray<TBase> {
     return new ByteArray<TBase>(this.#U8Array.subarray(start, end) as TBase);
   }
@@ -354,6 +372,38 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     writeUInt8(this.#U8Array, value, offset);
   }
 
+  public writeBigInt64BE(value: bigint, offset: number): void {
+    writeBigInt64BE(this.#U8Array, value, offset);
+  }
+
+  public writeBigInt64LE(value: bigint, offset: number): void {
+    writeBigInt64LE(this.#U8Array, value, offset);
+  }
+
+  public writeBigUInt64BE(value: bigint, offset: number): void {
+    writeBigUInt64BE(this.#U8Array, value, offset);
+  }
+
+  public writeBigUInt64LE(value: bigint, offset: number): void {
+    writeBigUInt64LE(this.#U8Array, value, offset);
+  }
+
+  public readBigInt64LE(offset: number): bigint {
+    return readBigInt64LE(this.#U8Array, offset);
+  }
+
+  public readBigInt64BE(offset: number): bigint {
+    return readBigInt64BE(this.#U8Array, offset);
+  }
+
+  public readBigUInt64LE(offset: number): bigint {
+    return readBigUInt64LE(this.#U8Array, offset);
+  }
+
+  public readBigUInt64BE(offset: number): bigint {
+    return readBigUInt64BE(this.#U8Array, offset);
+  }
+
   public indexOf(subarray: ByteArray | Uint8Array, offset = 0) {
     return binaryIndexOf(
       this.#U8Array, subarray instanceof ByteArray ? subarray.#U8Array : subarray,
@@ -404,9 +454,11 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     }
   }
 
-  public cleanup(): void {
+  public cleanup(): this {
     this.#U8Array = null!;
     this.#U8Array = (this.#IsBuffer ? Buffer.alloc(0) : new Uint8Array(0)) as TBase;
+
+    return this;
   }
 }
 
@@ -516,16 +568,147 @@ export function writeUInt8(destination: Uint8Array, value: number, offset: numbe
   destination[offset] = value;
 }
 
+export function writeBigUInt64LE(destination: Uint8Array, value: bigint, offset: number): void {
+  ensureRange_(value, 0n, MAX_UINT64, "value 'typeof bigint'");
+  ensureBounds_(destination, offset, 8);
 
-export function bufferWithEncoding(buf: Buffer, enc?: BufferEncoding): Buffer | string;
+  const lo = Number(value & 0xffffffffn);
+  const hi = Number(value >> 0x20n & 0xffffffffn);
+
+  destination[offset] = lo;
+  destination[offset + 1] = lo >> 0x08;
+  destination[offset + 2] = lo >> 0x10;
+  destination[offset + 3] = lo >> 0x18;
+
+  destination[offset + 4] = hi;
+  destination[offset + 5] = hi >> 0x08;
+  destination[offset + 6] = hi >> 0x10;
+  destination[offset + 7] = hi >> 0x18;
+}
+
+export function writeBigUInt64BE(destination: Uint8Array, value: bigint, offset: number): void {
+  ensureRange_(value, 0n, MAX_UINT64, "value 'typeof bigint'");
+  ensureBounds_(destination, offset, 8);
+
+  const lo = Number(value & 0xffffffffn);
+  const hi = Number(value >> 0x20n & 0xffffffffn);
+
+  destination[offset] = hi >> 0x18;
+  destination[offset + 1] = hi >> 0x10;
+  destination[offset + 2] = hi >> 0x08;
+  destination[offset + 3] = hi;
+
+  destination[offset + 4] = lo >> 0x18;
+  destination[offset + 5] = lo >> 0x10;
+  destination[offset + 6] = lo >> 0x08;
+  destination[offset + 7] = lo;
+}
+
+export function writeBigInt64LE(destination: Uint8Array, value: bigint, offset: number): void {
+  ensureRange_(value, MIN_INT64, MAX_INT64, "value 'typeof bigint'");
+  ensureBounds_(destination, offset, 8);
+
+  const lo = Number(value & 0xffffffffn);
+  const hi = Number(value >> 0x20n & 0xffffffffn);
+
+  destination[offset] = lo;
+  destination[offset + 1] = lo >> 0x08;
+  destination[offset + 2] = lo >> 0x10;
+  destination[offset + 3] = lo >> 0x18;
+
+  destination[offset + 4] = hi;
+  destination[offset + 5] = hi >> 0x08;
+  destination[offset + 6] = hi >> 0x10;
+  destination[offset + 7] = hi >> 0x18;
+}
+
+export function writeBigInt64BE(destination: Uint8Array, value: bigint, offset: number): void {
+  ensureRange_(value, MIN_INT64, MAX_INT64, "value 'typeof bigint'");
+  ensureBounds_(destination, offset, 8);
+
+  const lo = Number(value & 0xffffffffn);
+  const hi = Number(value >> 0x20n & 0xffffffffn);
+
+  destination[offset] = hi >> 0x18;
+  destination[offset + 1] = hi >> 0x10;
+  destination[offset + 2] = hi >> 0x08;
+  destination[offset + 3] = hi;
+
+  destination[offset + 4] = lo >> 0x18;
+  destination[offset + 5] = lo >> 0x10;
+  destination[offset + 6] = lo >> 0x08;
+  destination[offset + 7] = lo;
+}
+
+export function readBigUInt64LE(source: Uint8Array, offset: number): bigint {
+  ensureBounds_(source, offset, 8);
+
+  const lo = source[offset] | (source[offset + 1] << 8) | (source[offset + 2] << 16) | (source[offset + 3] << 24);
+  const hi = source[offset + 4] | (source[offset + 5] << 8) | (source[offset + 6] << 16) | (source[offset + 7] << 24);
+
+  // We use >>> 0 to ensure the 32-bit integers are treated as unsigned before converting to BigInt
+  return (BigInt(hi >>> 0) << 32n) | BigInt(lo >>> 0);
+}
+
+export function readBigUInt64BE(source: Uint8Array, offset: number): bigint {
+  ensureBounds_(source, offset, 8);
+
+  const hi = source[offset] << 24 | (source[offset + 1] << 16) | (source[offset + 2] << 8) | source[offset + 3];
+  const lo = source[offset + 4] << 24 | (source[offset + 5] << 16) | (source[offset + 6] << 8) | source[offset + 7];
+
+  return (BigInt(hi >>> 0) << 32n) | BigInt(lo >>> 0);
+}
+
+export function readBigInt64LE(source: Uint8Array, offset: number): bigint {
+  const unsigned = readBigUInt64LE(source, offset);
+  return BigInt.asIntN(0x40, unsigned);
+}
+
+export function readBigInt64BE(source: Uint8Array, offset: number): bigint {
+  const unsigned = readBigUInt64BE(source, offset);
+  return BigInt.asIntN(0x40, unsigned);
+}
+
+
+export function mask(
+  source: Uint8Array,
+  mask?: Uint8Array | number | null,
+  inplace: boolean = true // eslint-disable-line comma-dangle
+): Uint8Array {
+  if(!mask) {
+    if(inplace) return source;
+    const dest = new Uint8Array(source.length);
+    
+    for(let i = 0; i < source.length; ++i) {
+      dest[i] = source[i];
+    }
+
+    return dest;
+  }
+
+  const maskLen = mask instanceof Uint8Array ? mask.length : 1;
+  const dest = inplace ? source : new Uint8Array(source.length);
+
+  for(let i = 0; i < dest.length; ++i) {
+    const maskByte = mask instanceof Uint8Array
+      ? mask[i % maskLen]
+      : mask;
+
+    dest[i] = source[i] ^ maskByte;
+  }
+
+  return dest;
+}
+
+export function bufferWithEncoding(buf: Buffer, enc?: BufferEncoding | null): Buffer | string;
 export function bufferWithEncoding<T extends ByteArray<Uint8Array | Buffer> = ByteArray<Uint8Array | Buffer>>(
   buf: T,
-  enc?: ByteEncoding
+  enc?: ByteEncoding | null
 ): T | string;
 
 export function bufferWithEncoding(
   buf: ByteArray | Buffer,
-  enc?: BufferEncoding | ByteEncoding // eslint-disable-line comma-dangle
+  enc?: BufferEncoding | ByteEncoding | null // eslint-disable-line comma-dangle
 ): Buffer | ByteArray | string {
   if(hasNodeBuffer && Buffer.isBuffer(buf))
     return enc && Buffer.isEncoding(enc) ? buf.toString(enc) : buf;
@@ -594,4 +777,43 @@ export function chunkToBuffer(obj: unknown): Uint8Array {
     return obj;
 
   return toByteArray(obj).unwrap();
+}
+
+
+function ensureRange_(value: number, min: number, max: number, name?: string): void;
+function ensureRange_(value: bigint, min: bigint, max: bigint, name?: string): void;
+function ensureRange_(
+  value: bigint | number,
+  min: bigint | number,
+  max: bigint | number,
+  name?: string // eslint-disable-line comma-dangle
+): void {
+  if(typeof value === "bigint") {
+    if(typeof min !== "bigint" || typeof max !== "bigint") {
+      throw new CryptoError(`The value of "${name}" is out of range`);
+    }
+
+    if(value < min || value > max) {
+      throw new CryptoError(`The value of "${name}" is out of range`);
+    }
+  } else {
+    if(typeof min !== "number" || typeof max !== "number") {
+      throw new CryptoError(`The value of "${name}" is out of range`);
+    }
+
+    if(value < min || value > max) {
+      throw new CryptoError(`The value of "${name}" is out of range`);
+    }
+  }
+}
+
+function ensureBounds_(buf: Uint8Array, offset: number, byteLen: number): void {
+  if(offset < 0 || offset + byteLen > buf.length) {
+    const diff = buf.byteLength - (offset + byteLen);
+
+    throw new CryptoError(
+      `Attempt to access memory outside buffer bounds (${diff < 0 ? "-" : ""}0x${Math.abs(diff).toString(16).toUpperCase()})`,
+      ERROR_CODE.E_CRYPTO_OUT_OF_BOUNDS // eslint-disable-line comma-dangle
+    );
+  }
 }
