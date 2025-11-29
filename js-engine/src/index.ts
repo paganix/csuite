@@ -17,6 +17,10 @@ export {
 } from "./@internals/cancellation";
 
 export {
+  SystemClock,
+} from "./@internals/chrono";
+
+export {
   CryptoError,
   ERROR_CODE as CRYPTO_ERRNO_MAP,
 } from "./@internals/errors";

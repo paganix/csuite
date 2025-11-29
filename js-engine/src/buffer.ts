@@ -68,6 +68,8 @@ export interface IByteArrayLike<TBase extends Buffer | Uint8Array = Uint8Array> 
   unwrap(): TBase;
   clone(): IByteArrayLike<TBase>;
 
+  reverse(): IByteArray<TBase>;
+  toReversed(): IByteArray<TBase>;
   equals(other: IByteArrayLike<Buffer | Uint8Array> | Uint8Array): boolean;
   toString(encoding?: ByteEncoding): string;
   cleanup(): IByteArrayLike<TBase>;
@@ -327,6 +329,16 @@ export class ByteArray<TBase extends Buffer | Uint8Array = Uint8Array> implement
     res.set(this);
 
     return res as ByteArray<TBase>;
+  }
+
+  public reverse(): ByteArray<TBase> {
+    this.#U8Array.reverse();
+    return this;
+  }
+
+  public toReversed(): ByteArray<TBase> {
+    const arr = [ ...this.#U8Array ].reverse();
+    return ByteArray.from(arr) as ByteArray<TBase>;
   }
 
   public set(array: ByteArray, offset?: number): void;

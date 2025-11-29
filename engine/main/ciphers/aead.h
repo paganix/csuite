@@ -3,6 +3,7 @@
 
 
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 typedef struct {
@@ -17,5 +18,10 @@ typedef struct {
 
 AEADMode* aead_aes(const char *mode);
 AEADMode* aead_chacha20();
+
+int aead_encrypt(
+  const AEADMode *mode,
+  const IGetter<uint8_t> *key
+);
 
 #endif

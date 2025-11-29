@@ -29,3 +29,6 @@ export type WithImplicitCoercion<T> =
         | T
         | { valueOf(): T }
         | (T extends string ? { [Symbol.toPrimitive](hint: "string"): T } : never);
+
+
+export type GenericFunction = (...args: any[]) => unknown;

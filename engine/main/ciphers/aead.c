@@ -53,7 +53,7 @@ AEADMode* aead_aes(const char *mode) {
     return &AEAD_AES_CCM_MODE;
 
   if(strcmp(mode, "gcm") == 0 || strcmp(mode, "GCM") == 0)
-    return &AEAD_AES_CCM_MODE;
+    return &AEAD_AES_GCM_MODE;
 
   return NULL;
 }

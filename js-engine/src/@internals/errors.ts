@@ -24,6 +24,8 @@ export const enum ERROR_CODE {
 
   /** [describe the error] */
   E_CRYPTO_INVALID_KEY_LENGTH = 0x10C,
+
+  E_CRYPTO_OUT_OF_RANGE = 0x10D,
 }
 
 
